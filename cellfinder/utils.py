@@ -1,3 +1,4 @@
+from re import I
 from typing import Tuple
 
 import numpy as np
@@ -35,6 +36,10 @@ def image_to_patches(image : np.array, size : Tuple =(256, 256), shift=False):
                 jxf = sizeX
                 jx = sizeX - patch_x
             patch_dict[(jy, jx)] = (image[..., jy:jyf, jx:jxf])
+            if jxf >= sizeX:
+                break
+        if jyf >= sizeY:
+            break
     
     if shift:
         for jy in np.arange(patch_y//2, sizeY, dy):
@@ -57,16 +62,20 @@ def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False):
     dx = patchsize[1]
     dy = patchsize[0]
     pad = np.zeros(patchsize, dtype=np.float32)
-    pds = max(4, int(.01*dx))
+    pds = max(12, int(.01*dx))
+    pdy = dy - 2*pds
+    pdx = dx - 2*pds
     pad[pds:dy-pds, pds:dx-pds] = 1
     all_boxes = list()
     for k, vs in patch_dict.items():
-        v = vs[0]
+        v = np.squeeze(vs[0])
         boxes = vs[1]
         ky, kx = k
-        v = v*pad
-        rv = recon[..., ky:ky + dy, kx:kx + dx]
-        recon[..., ky:ky + dy, kx:kx + dx] = np.where(v > rv, v, rv)
+        ky = ky +pds
+        kx = kx + pds
+        pv = v[pds:-pds, pds:-pds]
+        rv = recon[..., ky:ky + pdy, kx:kx + pdx]
+        recon[..., ky:ky + pdy, kx:kx + pdx] = np.where(pv > rv, pv, rv)
         
         if boxes:
             for box in boxes:

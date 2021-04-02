@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 from cellfinder import infer, train
 
-def run_test(model_file, rundir=False):
+def run_test(model_file, x, prob=.95, rundir=False):
     tm = train.get_model(2)
     tm.load_state_dict(torch.load(model_file))
     # %%
@@ -17,21 +17,9 @@ def run_test(model_file, rundir=False):
     else:
         device = torch.device('cpu')
     
-    gp = '/home/cjw/Code/xlearn/cellfinder/Data/ND2Images/*.tif'
-    files = sorted(glob.glob(gp))
-                    
-    print(len(files))
     import time
-    cnn = infer.predict(tm, size=(400, 400), probability=.95)
-    rf = np.random.randint(0, len(files))
-    print(rf, files[rf])
-    x = tifffile.imread(files[rf])
+    cnn = infer.predict(tm, size=(400, 400), probability=prob)
     r, b = cnn(x)
-    plt.figure(figsize=(10,5))
-    plt.subplot(1,2,1)
-    plt.imshow(x) 
-    plt.subplot(1,2,2)
-    plt.imshow(r)
     return r 
     # for test in files:
     #     x = tifffile.imread(test)
