@@ -25,8 +25,9 @@ def get_model(num_classes):
     print("IFM", in_features_mask)
     hidden_layer = 256
     
-    model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer,
-                                                      num_classes)
+    model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask,
+                                                       hidden_layer,
+                                                       num_classes)
     
     return model
 
@@ -35,7 +36,7 @@ def collate(batch):
     return tuple(zip(*batch))
 
 def main(root='Data', image_dir='Images', mask_dir='Masks',
-         epochs=50, cropsize=(400, 400)):
+         epochs=50, cropsize=(400, 400), batch_size=8):
     if torch.cuda.is_available():
         device = torch.device('cuda')
     else:
@@ -53,7 +54,7 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
     data_test = torch.utils.data.Subset(data_test, indices[-1])
     
     data_loader = torch.utils.data.DataLoader(
-        data, batch_size=8, shuffle=True, num_workers=4,
+        data, batch_size=batch_size, shuffle=True, num_workers=4,
         collate_fn=collate)
     
     data_test_loader = torch.utils.data.DataLoader(
@@ -74,7 +75,7 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
     
     num_epochs = epochs
     model.train()
-    print('Training...')
+    print(f'Training on {device}...')
     for i in range(num_epochs):
         
         for images, targets in data_loader:

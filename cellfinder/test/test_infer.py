@@ -24,13 +24,15 @@ def run_test(model_file, rundir=False):
     import time
     cnn = infer.predict(tm, size=(400, 400), probability=.95)
     rf = np.random.randint(0, len(files))
+    print(rf, files[rf])
     x = tifffile.imread(files[rf])
     r, b = cnn(x)
     plt.figure(figsize=(10,5))
     plt.subplot(1,2,1)
     plt.imshow(x) 
     plt.subplot(1,2,2)
-    plt.imshow(r)    
+    plt.imshow(r)
+    return r 
     # for test in files:
     #     x = tifffile.imread(test)
     #     t1 = time.time()

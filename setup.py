@@ -1,5 +1,5 @@
 #! /ur/bin/env python
-from setuptools
+import setuptools
 
 DESCRIPTION = "Finetune Mask R-CNN"
 URL = "https://github.com/cwood1967/xlearn"

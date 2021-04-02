@@ -10,7 +10,8 @@ from scipy.ndimage import measurements
 
 class PombeDataset(object):
 
-    def __init__(self, rootdir, image_dir, mask_dir,transforms, ext=None):
+    def __init__(self, rootdir, image_dir, mask_dir,
+                 transforms, ext=None, multiplier=1):
         self.rootdir = rootdir
         self.transforms = transforms
         image_path = os.path.join(rootdir, image_dir)
@@ -18,7 +19,8 @@ class PombeDataset(object):
         images = list(sorted(os.listdir(image_path)))
         self.remove_nonimage(images, ext=ext)
         self.images = [os.path.join(rootdir, image_dir, j) for j in images]
-        self.images=10*self.images
+        self.images = multiplier*self.images
+        print(len(self.images))
         masks = list(sorted(os.listdir(mask_path)))
         self.remove_nonimage(masks)
         self.masks = [os.path.join(rootdir, mask_dir, j) for j in masks]
