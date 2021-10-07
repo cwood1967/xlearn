@@ -38,6 +38,31 @@ def collate(batch):
 
 def main(root='Data', image_dir='Images', mask_dir='Masks',
          epochs=50, cropsize=(400, 400), batch_size=8):
+    '''
+    Train the model and save network snapshots.
+    
+    root : str
+       The path to the data directory. Default is 'Data'
+    
+    image_dir : str
+        Directory inside to root where traing images are located. Default 'Images'
+    
+    mask_dir : str
+        Directory for training masks. Default is 'Masks'
+    
+    epochs : int
+        Number of epochs to train. Default 50
+    
+    cropsize : tuple (int, int)
+        Size of patches to use in training. Default (400, 400)
+    
+    batch_size : int
+        Size of image batches. Default 8
+    
+    Returns : MaskRCNN
+        The trained pytorch Mask RCNN model
+    '''
+
     if torch.cuda.is_available():
         device = torch.device('cuda')
     else:
@@ -110,5 +135,3 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
     print(loss_dict)
     torch.save(model.state_dict(), f"{modeldir}/trained_last_{i:04d}.pt")
     return model
-
-
