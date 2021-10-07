@@ -11,28 +11,32 @@ from scipy.ndimage import measurements
 class PombeDataset(object):
 
     def __init__(self, rootdir, image_dir, mask_dir,
-                 transforms, ext=None, multiplier=1):
+                 transforms, ext=None, multiplier=1, labels=False):
         self.rootdir = rootdir
         self.transforms = transforms
+        self.islabels = labels
         image_path = os.path.join(rootdir, image_dir)
         mask_path = os.path.join(rootdir, mask_dir)
         images = list(sorted(os.listdir(image_path)))
         self.remove_nonimage(images, ext=ext)
         self.images = [os.path.join(rootdir, image_dir, j) for j in images]
         self.images = multiplier*self.images
-        print(len(self.images))
+        print("Images in training set:", len(self.images))
         masks = list(sorted(os.listdir(mask_path)))
         self.remove_nonimage(masks)
         self.masks = [os.path.join(rootdir, mask_dir, j) for j in masks]
-        self.masks = 10*self.masks
+        self.masks = multiplier*self.masks
 
     def __getitem__(self, idx):
+        #print("idx", idx)
         image_path = self.images[idx]
         mask_path = self.masks[idx]
         a_image = imread(image_path).astype(np.float32)
-        a_image = np.expand_dims(a_image, -1)
-        amin = a_image.min()
-        amax = a_image.max()
+        if len(a_image.shape) == 2:
+            a_image = np.expand_dims(a_image, -1)
+
+        amin = a_image.min(axis=(0, 1), keepdims=True)
+        amax = a_image.max(axis=(0, 1), keepdims=True)
         a_image = (a_image - amin)/(amax - amin)
         #a_image = np.stack(3*[a_image.squeeze()], axis=-1)
         
@@ -46,7 +50,9 @@ class PombeDataset(object):
             _mask = mask.numpy()
         
             mask_labels, nobjects = self.label_mask(_mask, minsize=50) 
+            #print(nobjects)
             oid = np.unique(mask_labels)[1:]
+            #print(image_path, oid.shape)
             sep_masks = mask_labels == oid[:, None, None]
             sep_masks = torch.as_tensor(sep_masks, dtype=torch.uint8)
             boxes = self.get_boxes(mask_labels, nobjects)
@@ -72,8 +78,12 @@ class PombeDataset(object):
         return image, target
 
     def label_mask(self, mask, minsize = None):
-        labels, nlabels = measurements.label(mask)
-        
+        if self.islabels:
+            labels = mask
+            nlabels = int(mask.max())
+        else:
+            labels, nlabels = measurements.label(mask)
+        #print("Nlabels",nlabels)
         if minsize is not None:
             for i in range(1, nlabels):
                 nx = (labels == i).sum()
@@ -97,7 +107,7 @@ class PombeDataset(object):
     def get_boxes(self, mask_labels, nobjects):
 
         boxes = list()
-        for i in range(1, nobjects):
+        for i in range(1, nobjects + 1):
             pos = np.where(mask_labels == i)
             xmin = pos[2].min()
             xmax = pos[2].max()
@@ -113,8 +123,9 @@ class PombeDataset(object):
             if ymax == ymin:
                 mask_labels[mask_labels == i] = 0
                 #print("y== not right", ymin, ymax, pos[1].shape)
-                
-            boxes.append([xmin, ymin, xmax, ymax])
+            
+            if (ymax > ymin) and (xmax > xmin):    
+                boxes.append([xmin, ymin, xmax, ymax])
 
         return boxes
 

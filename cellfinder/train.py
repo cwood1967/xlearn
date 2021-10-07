@@ -1,4 +1,5 @@
 import os
+import time
 
 import torch
 import torch.utils.data
@@ -76,24 +77,38 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
     num_epochs = epochs
     model.train()
     print(f'Training on {device}...')
+    min_mask_loss = 10.0
+    timefmt = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+    modeldir = f"model_{timefmt}"
+    os.mkdir(modeldir)
     for i in range(num_epochs):
-        
+        elosses = 0 
         for images, targets in data_loader:
+            #print('LEN', len(images))
             images = list(image.to(device) for image in images)
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
            
             loss_dict = model(images, targets)
             losses = sum(loss for loss in loss_dict.values())
-            
+            elosses += losses 
             #if i % (num_epochs//100) == 0: 
-            print("**", i, losses)
+            #print("**", i, losses)#['loss_mask'])
+            # print("***", i, loss_dict['loss_box_reg'].cpu().detach().numpy(),
+            #       loss_dict['loss_mask'].cpu().detach().numpy())
             
             optimizer.zero_grad()
             losses.backward()
             optimizer.step()
-            
+        print(i, elosses)
+        if elosses < min_mask_loss:
+            min_mask_loss = elosses        
+        # if loss_dict['loss_mask'].cpu().detach().numpy() < min_mask_loss:
+        #     min_mask_loss = loss_dict['loss_mask'].cpu().detach().numpy() 
+            torch.save(model.state_dict(), f"{modeldir}/trained_min_mask_model_{i:04d}.pt")
+            print("i, saved min mask loss")
             #lr_sched.step()
     print(loss_dict)
+    torch.save(model.state_dict(), f"{modeldir}/trained_last_{i:04d}.pt")
     return model
 
 

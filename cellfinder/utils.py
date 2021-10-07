@@ -7,23 +7,30 @@ import matplotlib.patches as patches
 
 def image_to_patches(image : np.array, size : Tuple =(256, 256), shift=False):
     ndim = len(image.shape)
-    sizeX = image.shape[-1]
-    sizeY = image.shape[-2]
+    #print("input image shape", image.shape)
+    if ndim==3 and image.shape[-1] in [3,4]:
+        yc = 0
+        xc = 1
+    else:
+        xc = -1
+        yc = -2
+        
+    sizeX = image.shape[xc]
+    sizeY = image.shape[yc]
     
-    amin = image.min(axis=(-2, -1), keepdims=True)
-    amax = image.max(axis=(-2, -1), keepdims=True)
+    amin = image.min(axis=(yc, xc), keepdims=True)
+    amax = image.max(axis=(yc, xc), keepdims=True)
     image = (image - amin)/(amax - amin)
     
     patch_x = size[1]
     patch_y = size[0]
-    ## start of assuming one t and z, possibly multiple channels
+    ## start off assuming one t and z, possibly multiple channels
     ## and will put everything in a patch into network
     numx = sizeX//patch_x
     numy = sizeY/patch_y
 
     dx = patch_x//2
     dy = patch_y//2
-        
     patch_dict = dict()
     for jy in np.arange(0, sizeY, dy):
         jyf = jy + patch_y
@@ -35,7 +42,12 @@ def image_to_patches(image : np.array, size : Tuple =(256, 256), shift=False):
             if jxf > sizeX:
                 jxf = sizeX
                 jx = sizeX - patch_x
-            patch_dict[(jy, jx)] = (image[..., jy:jyf, jx:jxf])
+            if yc == 0:
+                patch_dict[(jy, jx)] = (image[jy:jyf, jx:jxf, :])
+            elif ndim == 2:
+                patch_dict[(jy, jx)] = (image[jy:jyf, jx:jxf])
+            else:
+                patch_dict[(jy, jx)] = (..., image[jy:jyf, jx:jxf])
             if jxf >= sizeX:
                 break
         if jyf >= sizeY:
@@ -53,41 +65,54 @@ def image_to_patches(image : np.array, size : Tuple =(256, 256), shift=False):
                     jxf = sizeX
                     jx = sizeX - patch_x
                 patch_dict[(jy, jx)] = (image[..., jy:jyf, jx:jxf])
-            
+    
     return patch_dict
 
 def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False):
-    recon = np.zeros(shape, dtype=np.float32)
+    if len(shape) == 3 and shape[-1] in [3, 4]:
+        rshape = shape[:2]
+    else:
+        rshape = shape
+    recon = np.zeros(rshape, dtype=np.float32)
     #print(patch_dict.keys())
     dx = patchsize[1]
     dy = patchsize[0]
     pad = np.zeros(patchsize, dtype=np.float32)
-    pds = max(12, int(.01*dx))
-    pdy = dy - 2*pds
-    pdx = dx - 2*pds
-    pad[pds:dy-pds, pds:dx-pds] = 1
-    all_boxes = list()
-    for k, vs in patch_dict.items():
-        v = np.squeeze(vs[0])
-        boxes = vs[1]
-        ky, kx = k
-        ky = ky +pds
-        kx = kx + pds
-        pv = v[pds:-pds, pds:-pds]
-        rv = recon[..., ky:ky + pdy, kx:kx + pdx]
-        recon[..., ky:ky + pdy, kx:kx + pdx] = np.where(pv > rv, pv, rv)
-        
-        if boxes:
-            for box in boxes:
-                box = box.copy()  
-                try:
-                    box[0] += kx
-                    box[2] += kx
-                    box[1] += ky
-                    box[3] += ky
-                except:
-                    print(box)
-                all_boxes.append(box)
+    if len(patch_dict) == 1:
+        vs = list(patch_dict.values())[0]
+        all_boxes = vs[1]
+        recon = np.squeeze(vs[0])
+    else:
+        pds = max(12, int(.01*dx))
+        pdy = dy - 2*pds
+        pdx = dx - 2*pds
+        pad[pds:dy-pds, pds:dx-pds] = 1
+        all_boxes = list()
+        for k, vs in patch_dict.items():
+            v = np.squeeze(vs[0])
+            if len(v.shape) > 2:
+                v = v.sum(axis=0)
+            boxes = vs[1]
+            ky, kx = k
+            ky = ky +pds
+            kx = kx + pds
+            pv = v[pds:-pds, pds:-pds]
+            rv = recon[..., ky:ky + pdy, kx:kx + pdx]
+            #print(v.shape, pv.shape, rv.shape, recon.shape)
+            recon[..., ky:ky + pdy, kx:kx + pdx] = np.where(pv > rv, pv, rv)
+            
+            if boxes:
+                for box in boxes:
+                    box = box.copy()  
+                    try:
+                        box[0] += kx
+                        box[2] += kx
+                        box[1] += ky
+                        box[3] += ky
+                    except:
+                        print(box)
+                    all_boxes.append(box)
+
     return recon, all_boxes
     
 
@@ -99,13 +124,17 @@ def getHighProb(predictions, prob=0.9):
     boxes = predictions['boxes']
     res_list= list()
     box_list = list()
+    score_list = list()
     res_list.append(0*masks[0])
     for i, s in enumerate(scores):
         if s >= prob:
+            if i==0:
+                res_list.pop()
             res_list.append(masks[i])
             box_list.append(boxes[i])
+            score_list.append(scores[i])
 
-    return np.stack(res_list), box_list
+    return np.stack(res_list), (box_list, score_list)
 
 
 def res_to_cpu(predictions):
@@ -123,7 +152,7 @@ def tensors_to_cpu(tensor_list):
     return tcpu
 
 
-def res_image(x, shape, prob=.75):
+def res_image(x, shape, max_project=True, prob=.75):
     """Return maximum projection of probabilities
 
     Parameters
@@ -142,7 +171,10 @@ def res_image(x, shape, prob=.75):
     """
     r, boxes = getHighProb(x, prob=prob)
     if len(r) > 1:
-        return r.max(axis=0), boxes 
+        if max_project:
+            return r.max(axis=0), boxes 
+        else:
+            return r, boxes
     else:
         return np.zeros(shape, dtype=np.float32), None
     

@@ -16,7 +16,7 @@ class predict():
     
     def __init__(self, model,
                  device='cuda', size=(400,400), axis=(-2, -1),
-                 probability=0.9):
+                 max_project=True, probability=0.9):
         """[summary]
 
         Parameters
@@ -39,23 +39,25 @@ class predict():
         self.model.to(device)
         self.xt = transforms.get_transforms(train=False)
         self.probability = probability
+        self.max_project = max_project
     
-    def __call__(self, image):
+    def __call__(self, image, step=40):
         
         image = self.normalize(image)
         torch.cuda.empty_cache()
             
         tensor_list_gpu = list()
         key_list = list()
-        dummy_mask = np.zeros((400,400), dtype=np.float32)
+        dummy_mask = np.zeros((self.patchsize[0], self.patchsize[1]), dtype=np.float32)
         patches = utils.image_to_patches(image, size=self.patchsize)
         for k, v in patches.items():
             vtrans, _ = self.xt(v, dummy_mask)
+            #print(vtrans.shape)
             tensor_list_gpu.append(vtrans.to(self.device))
             key_list.append(k)
 
         res = list()
-        step = 40
+        #step = 40
         for i in range(0, len(tensor_list_gpu), step):
             rg = self.model(tensor_list_gpu[i:i+step])
             r = utils.res_to_cpu(rg)
@@ -70,7 +72,9 @@ class predict():
         torch.cuda.empty_cache()
 
         patch_dict = {key_list[i]:
-            utils.res_image(res[i],tensor_list[0].shape, self.probability)
+            utils.res_image(res[i],tensor_list[0].shape,
+                            max_project=self.max_project,
+                            prob=self.probability)
             for i in range(len(tensor_list))}
 
         recon, boxes = utils.reconstruct_from_dict(patch_dict,

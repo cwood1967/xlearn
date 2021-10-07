@@ -78,13 +78,19 @@ class RandomCrop(object):
         Transformed image and mask
         """
         h, w = image.shape[-2:]
-        hc = self.size[1]
-        wc = self.size[0]
+        hc = self.size[0]
+        wc = self.size[1]
+
         ymax = h - hc
         xmax = w - wc
-
-        ry = random.randint(0, ymax)
-        rx = random.randint(0, xmax)
+        if hc >= h:
+            ry = 0
+        else:        
+            ry = random.randint(0, ymax)
+        if wc >=w:
+            rx = 0
+        else:
+            rx = random.randint(0, xmax)
 
         image = image[:, ry:ry + hc, rx:rx + wc]
         mask = mask[:, ry:ry + hc, rx:rx + wc]
