@@ -1,6 +1,7 @@
 import os
 import time
 
+import numpy as np
 import torch
 import torch.utils.data
 from torch import nn
@@ -12,12 +13,13 @@ from torchvision.models.detection.mask_rcnn import maskrcnn_resnet50_fpn
 from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
+from matplotlib import pyplot as plt
 from . import dataset
 from . import transforms
 
 
-def get_model(num_classes):
-    model = maskrcnn_resnet50_fpn(pretrained=True)
+def get_model(num_classes, pretrained=True):
+    model = maskrcnn_resnet50_fpn(pretrained=pretrained)
     
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
@@ -36,8 +38,13 @@ def get_model(num_classes):
 def collate(batch):
     return tuple(zip(*batch))
 
+def test_eval(model, test_dir):
+    pass
+
 def main(root='Data', image_dir='Images', mask_dir='Masks',
-         epochs=50, cropsize=(400, 400), batch_size=8):
+         epochs=50, cropsize=(400, 400), batch_size=8,
+         test_ratio=0, test_interval=10, display=False,
+         pretrained=True):
     '''
     Train the model and save network snapshots.
     
@@ -71,24 +78,30 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
     num_classes = 2
     
     xforms = transforms.get_transforms(cropsize=cropsize)
-    data = dataset.PombeDataset(root, image_dir, mask_dir, xforms)
-    data_test = dataset.PombeDataset(root, image_dir, mask_dir, xforms)
-    
-    indices = torch.randperm(len(data)).tolist()
-    # data = torch.utils.data.Subset(data, indices[:8])
+    testforms = transforms.get_transforms(cropsize=cropsize, train=False)
+    data_all = dataset.PombeDataset(root, image_dir, mask_dir, xforms)
+    #data_test = dataset.PombeDataset(root, image_dir, mask_dir, xforms)
+     
+    indices = torch.randperm(len(data_all)).tolist()
+    if test_ratio > 0:
+        ntest = max(int(test_ratio*len(data_all)), 1)
+    else:
+         ntest = 0
 
-    data_test = torch.utils.data.Subset(data_test, indices[-1])
-    
+    print("####", ntest, test_ratio)
+    data = torch.utils.data.Subset(data_all, indices[:-ntest])
+    data_test = torch.utils.data.Subset(data_all, indices[-ntest:])
+    data_test.dataset.transforms = testforms
     data_loader = torch.utils.data.DataLoader(
         data, batch_size=batch_size, shuffle=True, num_workers=4,
         collate_fn=collate)
     
     data_test_loader = torch.utils.data.DataLoader(
-        data_test, batch_size=1, shuffle=False, num_workers=2,
+        data_test, batch_size=ntest, shuffle=False, num_workers=2,
         collate_fn=collate)
     
     
-    model = get_model(2)
+    model = get_model(2, pretrained=pretrained)
     model.to(device)
     
     params = [p for p in model.parameters() if p.requires_grad]
@@ -125,6 +138,37 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
             losses.backward()
             optimizer.step()
         print(i, elosses)
+        if (ntest > 0) and (i % test_interval) == 0:
+            _ = model.eval()
+            for _ti, _tt in data_test_loader:
+                _ti = list(i.to(device) for i in _ti)
+                #_tt = list(_tt.do(device) for t in _tt)
+                _tr = model(_ti)
+                _tr = [_r['masks'].cpu().detach().numpy().max(axis=0).squeeze()
+                        for _r in _tr] 
+                _tt = [_t['masks'].cpu().detach().numpy().max(axis=0)
+                        for _t in _tt]
+
+                print(len(_tr), len(_tt)) 
+                _tr = np.where(np.stack(_tr) > .8, 1, 0)#.max(axis=0)
+                _tt = np.stack(_tt)#.max(axis=0)
+                #dice = 2*((_tr*_tt).sum())/(_tr.sum() + _tt.sum() + 1.)
+                dice = np.array([2*(_r*_t).sum()/(_t.sum() + _r.sum() + 1.) 
+                        for _r, _t in zip(_tr, _tt)])
+
+                print("*** Dice", dice.sum()/len(dice))
+            if display:
+                dmin = dice.argmin()
+                print("Min dice", dmin, dice[dmin])
+                fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+                idisp = _ti[dmin].cpu().detach().numpy()
+                idisp = np.moveaxis(idisp, 0, -1)
+                ax[0].imshow(idisp)
+                ax[1].imshow(_tr[dmin])
+                plt.show()
+
+            _ = model.train()
+
         if elosses < min_mask_loss:
             min_mask_loss = elosses        
         # if loss_dict['loss_mask'].cpu().detach().numpy() < min_mask_loss:

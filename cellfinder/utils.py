@@ -109,8 +109,8 @@ def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False):
                         box[2] += kx
                         box[1] += ky
                         box[3] += ky
-                    except:
-                        print(box)
+                    except Exception as e:
+                        print("Something went wrong", e, box)
                     all_boxes.append(box)
 
     return recon, all_boxes
