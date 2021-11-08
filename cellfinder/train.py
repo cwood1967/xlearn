@@ -89,17 +89,19 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
          ntest = 0
 
     print("####", ntest, test_ratio)
-    data = torch.utils.data.Subset(data_all, indices[:-ntest])
-    data_test = torch.utils.data.Subset(data_all, indices[-ntest:])
-    data_test.dataset.transforms = testforms
+    if ntest == 0:
+        data = torch.utils.data.Subset(data_all, indices)
+    else:
+        data = torch.utils.data.Subset(data_all, indices[:-ntest])
+        data_test = torch.utils.data.Subset(data_all, indices[-ntest:])
+        data_test.dataset.transforms = testforms
+        data_test_loader = torch.utils.data.DataLoader(
+            data_test, batch_size=ntest, shuffle=False, num_workers=2,
+            collate_fn=collate)
+
     data_loader = torch.utils.data.DataLoader(
         data, batch_size=batch_size, shuffle=True, num_workers=4,
         collate_fn=collate)
-    
-    data_test_loader = torch.utils.data.DataLoader(
-        data_test, batch_size=ntest, shuffle=False, num_workers=2,
-        collate_fn=collate)
-    
     
     model = get_model(2, pretrained=pretrained)
     model.to(device)

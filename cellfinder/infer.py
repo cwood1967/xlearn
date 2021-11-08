@@ -1,6 +1,7 @@
 import glob
 import os
-import pickle 
+import pickle
+from re import I 
 
 import numpy as np
 import tifffile
@@ -41,9 +42,9 @@ class predict():
         self.probability = probability
         self.max_project = max_project
     
-    def __call__(self, image, step=40):
+    def __call__(self, image, step=40, norm_axis=(-2, -1)):
         
-        image = self.normalize(image)
+        image = self.normalize(image, axis=norm_axis)
         torch.cuda.empty_cache()
             
         tensor_list_gpu = list()
@@ -84,7 +85,27 @@ class predict():
         self.prediction = recon
         self.boxes = boxes
         return recon, boxes
-    
+
+    def predict_batch(self, batch, norm_axis=(1,2)):
+        batch = self.normalize(batch, axis=norm_axis)
+        # torch.cuda.empty_cache()
+        dummy_mask = np.zeros((self.patchsize[0], self.patchsize[1]),
+                              dtype=np.float32)
+
+        tensor_list_gpu = list()
+        for v in batch:
+            vtrans, _ = self.xt(v, dummy_mask)
+            tensor_list_gpu.append(vtrans.to(self.device))
+        
+        res = self.model(tensor_list_gpu)
+        for _r in res:
+            _r['masks'] = _r['masks'].detach().cpu().numpy()    
+            _r['boxes'] = _r['boxes'].detach().cpu().numpy()    
+            _r['scores'] = _r['scores'].detach().cpu().numpy()    
+
+        torch.cuda.empty_cache()
+        return res
+        
     def normalize(self, a, axis=(-2,-1)):
         amin = a.min(axis=axis, keepdims=True)
         amax = a.max(axis=axis, keepdims=True)
