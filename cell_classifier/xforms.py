@@ -7,7 +7,7 @@ from torchvision.transforms import RandomRotation as torchRotation
 from torchvision.transforms import ToPILImage
 from torchvision.transforms import RandomHorizontalFlip, RandomVerticalFlip
 from torchvision.transforms import Normalize, ToTensor
-from torchvision.transforms import RandomResizedCrop 
+from torchvision.transforms import RandomResizedCrop, CenterCrop
 from torchvision.transforms import functional as F
 
 class Compose(object):
@@ -21,7 +21,6 @@ class Compose(object):
 
 
 def get_transforms(cropsize=(400,400), prob=0.5, train=True):
-    print("Hello")
     transforms = list()
     if train:
         transforms.extend(
@@ -40,7 +39,8 @@ def get_transforms(cropsize=(400,400), prob=0.5, train=True):
         #                    #ToTensor()
         # ])
     else:
-        transforms.extend([ToTensor()])
+        transforms.extend([ToTensor(),
+                           CenterCrop(cropsize)])
         
     return Compose(transforms)
     
