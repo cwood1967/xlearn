@@ -42,7 +42,8 @@ class predict():
         self.probability = probability
         self.max_project = max_project
     
-    def __call__(self, image, step=40, norm_axis=(-2, -1)):
+    @torch.no_grad()
+    def __call__(self, image, step=10, norm_axis=(-2, -1)):
         
         image = self.normalize(image, axis=norm_axis)
         torch.cuda.empty_cache()
@@ -86,6 +87,7 @@ class predict():
         self.boxes = boxes
         return recon, boxes
 
+    @torch.no_grad()
     def predict_batch(self, batch, norm_axis=(1,2)):
         batch = self.normalize(batch, axis=norm_axis)
         # torch.cuda.empty_cache()

@@ -41,22 +41,18 @@ class PombeDataset(object):
         #a_image = np.stack(3*[a_image.squeeze()], axis=-1)
         
         a_mask = imread(mask_path)
-        #print('***', image.shape, mask.shape)
         boxes = []
         while len(boxes) == 0:
             if self.transforms is not None:
                 image, mask = self.transforms(a_image, a_mask)
 
             _mask = mask.numpy()
-        
+
             mask_labels, nobjects = self.label_mask(_mask, minsize=50) 
-            #print(nobjects)
             oid = np.unique(mask_labels)[1:]
-            #print(image_path, oid.shape)
-            sep_masks = mask_labels == oid[:, None, None]
+            sep_masks = (mask_labels == oid[:, None, None])
             sep_masks = torch.as_tensor(sep_masks, dtype=torch.uint8)
             boxes = self.get_boxes(mask_labels, nobjects)
-            #print("bbbb", len(boxes), mask.max(), mask.sum())
             
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         labels = torch.ones((nobjects,), dtype=torch.int64)

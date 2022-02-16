@@ -78,6 +78,27 @@ class RandomCrop(object):
         Transformed image and mask
         """
         h, w = image.shape[-2:]
+        ypad = h 
+        xpad = w 
+        if h < self.size[0]:
+            ypad = self.size[0] + 100
+        if w < self.size[1]:
+            xpad = self.size[1] + 100
+        
+        pad = np.zeros((ypad, xpad, image.shape[0]), dtype=np.float32) 
+        mask_pad = np.zeros((ypad, xpad, 1), dtype=np.float32) 
+        # mask_pad = pad.copy()
+        pad = F.to_tensor(pad).type(torch.FloatTensor)
+        mask_pad = F.to_tensor(mask_pad).type(torch.FloatTensor)
+        yoffset = (ypad - h)//2 
+        xoffset = (xpad - w)//2
+        
+        pad[:, yoffset:yoffset + h, xoffset:xoffset + w] = image 
+        mask_pad[:, yoffset:yoffset + h, xoffset:xoffset + w] = mask 
+        #mask_pad[yoffset:yoffset + h, xoffset:xoffset + w] = mask 
+        image = pad
+        mask = mask_pad 
+
         hc = self.size[0]
         wc = self.size[1]
 
@@ -94,6 +115,7 @@ class RandomCrop(object):
 
         image = image[:, ry:ry + hc, rx:rx + wc]
         mask = mask[:, ry:ry + hc, rx:rx + wc]
+        #mask = mask[ry:ry + hc, rx:rx + wc]
         return image, mask
 
 
