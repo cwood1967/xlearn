@@ -6,8 +6,8 @@ import numpy as np
 from torchvision.transforms import RandomRotation as torchRotation
 from torchvision.transforms import ToPILImage
 from torchvision.transforms import RandomHorizontalFlip, RandomVerticalFlip
-from torchvision.transforms import Normalize, ToTensor
-from torchvision.transforms import RandomResizedCrop, CenterCrop
+from torchvision.transforms import Normalize, ToTensor, RandomAutocontrast
+from torchvision.transforms import RandomResizedCrop, CenterCrop, GaussianBlur
 from torchvision.transforms import functional as F
 
 class Compose(object):
@@ -29,6 +29,8 @@ def get_transforms(cropsize=(400,400), prob=0.5, train=True):
                                ratio=(.9, 1.1)),
              RandomHorizontalFlip(),
              RandomVerticalFlip(),
+             GaussianBlur(5),
+             RandomAutocontrast()
             #  ToTensor(),
             # Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
