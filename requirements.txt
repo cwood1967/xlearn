@@ -1,0 +1,13 @@
+numpy
+scipy
+pandas
+matplotlib
+nd2reader
+tifffile
+-i https://download.pytorch.org/whl/cu113
+torch
+-i https://download.pytorch.org/whl/cu113
+torchvision
+-i https://download.pytorch.org/whl/cu113
+torchaudio
+

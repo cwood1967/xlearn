@@ -1,0 +1,27 @@
+name: deepmask
+channels:
+  - pytorch
+  - conda-forge
+
+dependencies:
+  - python=3.9
+  - pip
+  - cudatoolkit=11.3
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pip:
+      - jupyter
+      - numpy
+      - tifffile
+      - nd2reader
+      - scipy
+      - scikit-image
+      - pandas
+      - matplotlib
+        #- torch --extra-index-url https://download.pytorch.org/whl/cu113
+        #- torchvision --extra-index-url https://download.pytorch.org/whl/cu113
+        #- torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+      - --trusted-host webfs
+      - https://webfs/n/core/micro/internal/cjw/wheels/xlearn-0.0.0-py3-none-any.whl
+      - https://webfs/n/core/micro/internal/cjw/wheels/cjwutils-0.0.3-py3-none-any.whl
