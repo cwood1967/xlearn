@@ -4,7 +4,85 @@ from typing import Tuple
 import numpy as np
 from matplotlib import pyplot as plt 
 import matplotlib.patches as patches
+from skimage.transform import resize
 
+
+def resize_to_patch(image, patchsize):
+    ''' Resize the image to the size of the patch
+
+    Parameters
+    ----------
+    image : array
+        the image to resize
+    patchsize : tuple (int, int)  
+        the size of the patch in (y, x)
+        
+    Returns
+    -------
+    pad : array
+        the resized image
+    '''
+    py, px = patchsize[0], patchsize[1]
+    sy, sx = image.shape 
+    ry = sy/py
+    rx = sx/px
+
+    sc = max(ry, rx)
+    
+    if sc > 1:
+        _image = resize(image, (int(sy/ry), int(sx/rx)))
+    else:
+        _image = image.copy()
+        
+    _sy, _sx = _image.shape
+    dy = (py - _sy)//2 
+    dx = (px - _sx)//2
+    
+    pad = np.zeros(patchsize, dtype=np.float32)
+    pad[dy:dy + _sy, dx:dx + _sx] = _image
+    return pad
+
+
+def resize_to_original(pad, patchsize, original_size):
+    '''Resize an image (predicted usually) back to the original size
+    
+    Parameters
+    ----------
+    pad : array
+        the image to resize
+    patchsize : tuple
+        the size the pad was resized to
+    original_size : tuple
+        the size before pad was resize, and the output size
+        
+    Returns
+    -------
+    image : array
+        image resized bask to the original size:w
+    ''' 
+
+    py, px = patchsize
+    sy, sx = original_size
+    
+    ry = sy/py
+    rx = sx/px
+    
+    sc = max(ry, rx)
+    if sc > 1:
+        _sy = int(sy/ry)
+        _sx = int(sx/rx) 
+    else:
+        _sx = sx
+        _sy = sy
+    
+    dy = (py - _sy)//2
+    dx = (px - _sx)//2
+    
+    _image = pad[dy:dy + _sy, dx:dx + _sx]
+    image = resize(_image, (sy, sx))
+    return image
+    
+    
 def image_to_patches(image : np.array, size : Tuple =(256, 256), shift=False):
     ndim = len(image.shape)
     #print("input image shape", image.shape)
@@ -68,13 +146,14 @@ def image_to_patches(image : np.array, size : Tuple =(256, 256), shift=False):
     
     return patch_dict
 
-def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False):
+def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False,
+                          edges=.01):
     if len(shape) == 3 and shape[-1] in [3, 4]:
         rshape = shape[:2]
     else:
         rshape = shape
     recon = np.zeros(rshape, dtype=np.float32)
-    #print(patch_dict.keys())
+
     dx = patchsize[1]
     dy = patchsize[0]
     pad = np.zeros(patchsize, dtype=np.float32)
@@ -83,7 +162,7 @@ def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False):
         all_boxes = vs[1]
         recon = np.squeeze(vs[0])
     else:
-        pds = max(12, int(.01*dx))
+        pds = int(edges*dx) #max(12, int(edges*dx))
         pdy = dy - 2*pds
         pdx = dx - 2*pds
         pad[pds:dy-pds, pds:dx-pds] = 1
@@ -94,12 +173,14 @@ def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False):
                 v = v.sum(axis=0)
             boxes = vs[1]
             ky, kx = k
-            ky = ky +pds
-            kx = kx + pds
-            pv = v[pds:-pds, pds:-pds]
-            rv = recon[..., ky:ky + pdy, kx:kx + pdx]
-            #print(v.shape, pv.shape, rv.shape, recon.shape)
-            recon[..., ky:ky + pdy, kx:kx + pdx] = np.where(pv > rv, pv, rv)
+            # ky = ky + pds
+            # kx = kx + pds
+            # pv = v[pds:dy - pds, pds: dx - pds]
+            pv = pad*v
+
+            # rv = recon[..., ky:ky + pdy, kx:kx + pdx]
+            rv = recon[..., ky:ky + dy, kx:kx + dx]
+            recon[..., ky:ky + dy, kx:kx + dx] = np.where(pv >= rv, pv, rv)
             
             if boxes:
                 for box in boxes:
@@ -110,9 +191,8 @@ def reconstruct_from_dict(patch_dict, shape, patchsize, shift=False):
                         box[1] += ky
                         box[3] += ky
                     except Exception as e:
-                        print("Something went wrong", e, box)
+                        pass
                     all_boxes.append(box)
-
     return recon, all_boxes
     
 
@@ -170,6 +250,7 @@ def res_image(x, shape, max_project=True, prob=.75):
         max projection of probabilites
     """
     r, boxes = getHighProb(x, prob=prob)
+    #print("res_image", r.shape)
     if len(r) > 1:
         if max_project:
             return r.max(axis=0), boxes 

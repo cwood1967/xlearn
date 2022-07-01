@@ -17,7 +17,7 @@ class predict():
     
     def __init__(self, model,
                  device='cuda', size=(400,400), axis=(-2, -1),
-                 max_project=True, probability=0.9):
+                 max_project=True, probability=0.9, edges=.01):
         """[summary]
 
         Parameters
@@ -41,13 +41,16 @@ class predict():
         self.xt = transforms.get_transforms(train=False)
         self.probability = probability
         self.max_project = max_project
+        self.edges = edges
+    
     
     @torch.no_grad()
-    def __call__(self, image, step=10, norm_axis=(-2, -1)):
-        
+    def __call__(self, image, step=10, norm_axis=(-2, -1), return_patches=False):
+        #print(return_patches) 
         image = self.normalize(image, axis=norm_axis)
         torch.cuda.empty_cache()
             
+        
         tensor_list_gpu = list()
         key_list = list()
         dummy_mask = np.zeros((self.patchsize[0], self.patchsize[1]), dtype=np.float32)
@@ -81,11 +84,15 @@ class predict():
 
         recon, boxes = utils.reconstruct_from_dict(patch_dict,
                                             image.shape,
-                                            self.patchsize, shift=True)
+                                            self.patchsize, shift=True,
+                                            edges=self.edges)
     
         self.prediction = recon
         self.boxes = boxes
-        return recon, boxes
+        if return_patches:
+            return recon, boxes, patch_dict
+        else:
+            return recon, boxes
 
     @torch.no_grad()
     def predict_batch(self, batch, norm_axis=(1,2)):
