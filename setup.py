@@ -14,6 +14,8 @@ INSTALL_REQUIRES = [
     'matplotlib>=2.2',
     'nd2reader>=3.2.3',
     'tifffile>=2020.7.24',
+    'torch',
+    'torchvision',
 ]
 
 if __name__ == "__main__":
