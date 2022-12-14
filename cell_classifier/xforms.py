@@ -20,11 +20,21 @@ class Compose(object):
         return image
 
 
+def gray_to_rgb(x):
+    if len(x.shape) == 2:
+        x = np.stack([x, x, x], axis=-1)
+    return x
+
+def to_float32(x):
+    return x.astype(np.float32)
+
 def get_transforms(cropsize=(400,400), prob=0.5, train=True):
     transforms = list()
     if train:
         transforms.extend(
-            [ToTensor(),
+            [to_float32,
+             gray_to_rgb,
+             ToTensor(),
              RandomResizedCrop(cropsize, scale=(0.9, 1.0),
                                ratio=(.9, 1.1)),
              RandomHorizontalFlip(),
@@ -41,7 +51,8 @@ def get_transforms(cropsize=(400,400), prob=0.5, train=True):
         #                    #ToTensor()
         # ])
     else:
-        transforms.extend([ToTensor(),
+        transforms.extend([gray_to_rgb,
+                           ToTensor(),
                            CenterCrop(cropsize)])
         
     return Compose(transforms)

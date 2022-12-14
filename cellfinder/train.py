@@ -1,4 +1,5 @@
 import os
+from re import I
 import time
 
 import numpy as np
@@ -14,6 +15,7 @@ from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 from matplotlib import pyplot as plt
+from skimage.io import imsave
 from . import dataset
 from . import transforms
 
@@ -44,7 +46,7 @@ def test_eval(model, test_dir):
 def main(root='Data', image_dir='Images', mask_dir='Masks',
          epochs=50, cropsize=(400, 400), batch_size=8,
          test_ratio=0, test_interval=10, display=False,
-         pretrained=True):
+         pretrained=True, png_progress=False):
     '''
     Train the model and save network snapshots.
     
@@ -114,7 +116,8 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
     lr_sched = torch.optim.lr_scheduler.StepLR(optimizer,
                                                step_size=10,
                                                gamma=0.1)
-    
+   
+     
     num_epochs = epochs
     model.train()
     print(f'Training on {device}...')
@@ -151,6 +154,18 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
                         for _r in _tr] 
                 _tt = [_t['masks'].cpu().detach().numpy().max(axis=0)
                         for _t in _tt]
+
+                if png_progress:
+                    if not os.path.exists("png_progress"):
+                        os.mkdir("png_progress")
+                    pg = 255*_tr[0]
+                    pg = pg.astype(np.uint8)
+                    cputi = _ti[0].cpu().detach().numpy()
+                    cputi = 255*(cputi - cputi.min())/(cputi.max() - cputi.min())
+                    cputi = cputi.astype(np.uint8)
+                    cputi = np.moveaxis(cputi, 0, -1)
+                    imsave(f"png_progress/{i:04d}_image.png", cputi)
+                    imsave(f"png_progress/{i:04d}_mask.png", pg)
 
                 print(len(_tr), len(_tt)) 
                 _tr = np.where(np.stack(_tr) > .8, 1, 0)#.max(axis=0)
