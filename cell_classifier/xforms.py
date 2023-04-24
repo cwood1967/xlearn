@@ -39,6 +39,7 @@ def get_transforms(cropsize=(400,400), prob=0.5, train=True):
                                ratio=(.9, 1.1)),
              RandomHorizontalFlip(),
              RandomVerticalFlip(),
+             torchRotation(90),
              GaussianBlur(5),
              RandomAutocontrast()
             #  ToTensor(),
@@ -51,7 +52,8 @@ def get_transforms(cropsize=(400,400), prob=0.5, train=True):
         #                    #ToTensor()
         # ])
     else:
-        transforms.extend([gray_to_rgb,
+        transforms.extend([to_float32,
+                           gray_to_rgb,
                            ToTensor(),
                            CenterCrop(cropsize)])
         

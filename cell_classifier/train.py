@@ -17,9 +17,10 @@ from torch.optim import lr_scheduler
 from torch.backends import cudnn
 import numpy as np
 import torchvision
+from torch.utils.data import Dataset, random_split
 
 from torchvision import datasets, models, transforms
-from torchvision.models import resnet101, resnet
+from torchvision.models import resnet101, resnet, resnet50
 from matplotlib import pyplot as plt
 import tifffile
 
@@ -47,6 +48,7 @@ def get_model(num_classes, device, pretrained=True, lr=0.001):
         The resnet101 model
     '''
     if pretrained:
+        # model = resnet50(weights=resnet.ResNet50_Weights.IMAGENET1K_V2)
         model = resnet101(weights=resnet.ResNet101_Weights.IMAGENET1K_V2)
     else:
         model = resnet101()
@@ -59,15 +61,52 @@ def get_model(num_classes, device, pretrained=True, lr=0.001):
     model = model.to(device)
 
     loss = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=lr,
+                    momentum=0.0,
+                    nesterov=False,
+                    weight_decay=.0,
+                    )
+
+    #optimizer = optim.NAdam(model.parameters(), lr=lr,
+    #                       weight_decay=.00001, eps=5e-8)
     
     exp_lr_sched = lr_scheduler.StepLR(optimizer=optimizer, step_size=20,
-                                       gamma=0.5)
+                                       gamma=0.9)
  
     
     return model, loss, optimizer, exp_lr_sched
 
-def get_dataloader(datadir, xforms, batchsize=8):
+
+class cdataset(Dataset):
+    
+    def __init__(self, dataset, transform=None, classmap=None):
+        self.dataset = dataset
+        self.transform = transform
+        self.classmap = classmap
+        
+    def __getitem__(self, index):
+        
+        data = self.dataset[index][0]
+        
+        if self.transform:
+            x = self.transform(data)
+        else:
+            x = data
+            
+        _y = self.dataset[index][1]
+        if self.classmap is None:
+            y = _y
+        else:
+            y = self.classmap[_y]
+            
+            
+        return x, y 
+    
+    def __len__(self):
+        return len(self.dataset)
+
+
+def get_dataloader(datadir, xforms, batchsize=8, classmap=None):
     """ Create a dataloader for training classifier 
 
     Parameters
@@ -91,12 +130,25 @@ def get_dataloader(datadir, xforms, batchsize=8):
     ds_sizes : dict
         The length of the training and validation datasets.
     """
-    ds= {x: datasets.ImageFolder(os.path.join(datadir, x),
-                                 xforms[x])
-         for x in ['train', 'val']}
+    # ds= {x: datasets.ImageFolder(os.path.join(datadir, x),
+    #                              xforms[x])
+    #      for x in ['train', 'val']}
+   
+
+    _ds = datasets.ImageFolder(datadir)
+    _ds.loader = tifffile.imread
     
-    ds['train'].loader = tifffile.imread
-    ds['val'].loader = tifffile.imread
+    nt = int(.8*(len(_ds)))
+    nv = int(.5*(len(_ds) - nt))
+    ntest = len(_ds) - nv - nt
+    _train, _val, _test = random_split(_ds, (nt, nv, ntest))
+
+    train_ds = cdataset(_train, xforms['train'], classmap=classmap)
+    val_ds = cdataset(_val, xforms['val'], classmap=classmap)
+    # test_ds = cdataset(_test, xforms['val'], classmap=classmap)
+    
+    test_images = [_ds.samples[i] for i in _test.indices]
+    ds = {'train':train_ds, 'val':val_ds}
     
     dataloaders = {x: DataLoader(ds[x], batch_size=batchsize,
                                  shuffle=True, num_workers=4)
@@ -104,10 +156,10 @@ def get_dataloader(datadir, xforms, batchsize=8):
     
     ds_sizes = {x: len(ds[x]) for x in ['train', 'val']}
     
-    return ds, dataloaders, ds_sizes
+    return ds, dataloaders, ds_sizes, test_images
 
 
-def main(root='Data', epochs=100, cropsize=(400,400),
+def main(root='Data', epochs=100, cropsize=(400,400), classmap=None,
          batch_size=8, pretrained=True, num_classes=4, lr=.001):
     """ Run the training
 
@@ -140,11 +192,14 @@ def main(root='Data', epochs=100, cropsize=(400,400),
         
     # num_classes = 4
 
+    print(num_classes)
+
     xf = {'train':xforms.get_transforms(cropsize=cropsize),
           'val':xforms.get_transforms(cropsize=cropsize, train=False)}
     
         
-    ds, dataloaders, ds_sizes = get_dataloader(root, xf, batchsize=batch_size)
+    ds, dataloaders, ds_sizes, test_images = get_dataloader(root, xf,
+                                    batchsize=batch_size, classmap=classmap)
 
     model, func_loss, optimizer, lr_sched = get_model(num_classes, device, lr=lr)
     
@@ -202,4 +257,4 @@ def main(root='Data', epochs=100, cropsize=(400,400),
             
              
     model.load_state_dict(best_model_wts)
-    return model
+    return model, test_images

@@ -78,6 +78,7 @@ class RandomCrop(object):
         Transformed image and mask
         """
         h, w = image.shape[-2:]
+        # print("image shape in crop", image.shape)
         ypad = h 
         xpad = w 
         if h < self.size[0]:
