@@ -44,9 +44,10 @@ def test_eval(model, test_dir):
     pass
 
 def main(root='Data', image_dir='Images', mask_dir='Masks',
-         epochs=50, cropsize=(400, 400), batch_size=8,
+         epochs=50, cropsize=(400, 400),
+         model=None, batch_size=8,
          test_ratio=0, test_interval=10, display=False,
-         pretrained=True, png_progress=False):
+         pretrained=True, png_progress=False, mask_labels=True):
     '''
     Train the model and save network snapshots.
     
@@ -81,7 +82,8 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
     
     xforms = transforms.get_transforms(cropsize=cropsize)
     testforms = transforms.get_transforms(cropsize=cropsize, train=False)
-    data_all = dataset.PombeDataset(root, image_dir, mask_dir, xforms)
+    data_all = dataset.PombeDataset(root, image_dir, mask_dir, xforms,
+                                    labels=mask_labels)
     #data_test = dataset.PombeDataset(root, image_dir, mask_dir, xforms)
      
     indices = torch.randperm(len(data_all)).tolist()
@@ -105,7 +107,8 @@ def main(root='Data', image_dir='Images', mask_dir='Masks',
         data, batch_size=batch_size, shuffle=True, num_workers=4,
         collate_fn=collate)
     
-    model = get_model(2, pretrained=pretrained)
+    if model is None:
+        model = get_model(2, pretrained=pretrained)
     model.to(device)
     
     params = [p for p in model.parameters() if p.requires_grad]

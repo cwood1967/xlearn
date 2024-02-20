@@ -159,7 +159,8 @@ def get_dataloader(datadir, xforms, batchsize=8, classmap=None):
     return ds, dataloaders, ds_sizes, test_images
 
 
-def main(root='Data', epochs=100, cropsize=(400,400), classmap=None,
+def main(root='Data', epochs=100, cropsize=(400,400),
+         model=None, classmap=None,
          batch_size=8, pretrained=True, num_classes=4, lr=.001):
     """ Run the training
 
@@ -201,7 +202,17 @@ def main(root='Data', epochs=100, cropsize=(400,400), classmap=None,
     ds, dataloaders, ds_sizes, test_images = get_dataloader(root, xf,
                                     batchsize=batch_size, classmap=classmap)
 
-    model, func_loss, optimizer, lr_sched = get_model(num_classes, device, lr=lr)
+    if model is None:
+        model, func_loss, optimizer, lr_sched \
+            = get_model(num_classes, device, lr=lr)
+    else:
+        func_loss = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(model.parameters(), lr=lr,
+                        momentum=0.0,
+                        nesterov=False,
+                        weight_decay=.0,
+                        )
+
     
     bwt = copy.deepcopy(model.state_dict())
     best_acc = 0.0 

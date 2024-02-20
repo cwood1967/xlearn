@@ -4,7 +4,7 @@ import setuptools
 DESCRIPTION = "Finetune Mask R-CNN"
 URL = "https://github.com/cwood1967/xlearn"
 LICENSE = 'MIT'
-VERSION = '0.0.1'
+VERSION = '0.0.2'
 PYTHON_REQUIRES = ">=3.6"
 
 INSTALL_REQUIRES = [
